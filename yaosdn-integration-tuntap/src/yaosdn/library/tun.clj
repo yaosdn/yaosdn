@@ -2,7 +2,8 @@
   (:import (java.nio ByteBuffer)
            (org.it4y.net.tuntap TunDevice)
            (org.pcap4j.packet AbstractPacket))
-  (:require [yaosdn.library.pcap]))
+  (:require [yaosdn.library.proto :as proto]
+            [yaosdn.library.pcap]))
 
 
 (defmacro with-tun-interface [if-name & body]
@@ -52,3 +53,45 @@
 
 (defn ^Boolean tun-has-data? [^TunDevice tun]
   (.isDataReady tun *tun-timeout*))
+
+
+(def ^:dynamic *default-tun-interface* "tun0")
+
+
+(defn- get-tun-connection [packet-processor params]
+  (let [{interface-name :interface-name} params
+        tun (get-tun-interface interface-name)]
+    (assoc packet-processor
+           :interface tun)))
+
+
+(defn- read-tun-packets [interface filter-function]
+  (loop [result ()]
+    (if-not (tun-has-data? interface)
+      result
+      (recur (concat result
+                     (let [data (poll-tun-packet interface)]
+                       (when (filter-function data)
+                         (list data))))))))
+
+
+(defn- write-tun-packets [interface packets]
+  (count (for [packet packets]
+           (push-tun-packet interface packet))))
+
+
+(defrecord TunPacketProcessor [interface]
+  proto/PacketProcessor
+  (connect [packet-processor] (.connect packet-processor nil))
+  (connect [packet-processor params] (get-tun-connection packet-processor
+                                                         params))
+  (close [packet-processor] (assoc packet-processor
+                                   :connection (.close interface)))
+  (get-packets [packet-processor] (.get-packets packet-processor identity))
+  (get-packets [packet-processor filter-function] (read-tun-packets interface filter-function))
+  (send-packets [packet-processor router-function packets] (write-tun-packets interface packets)))
+
+
+(defn new-tun-packet-processor [& [params]]
+  (-> (->TunPacketProcessor nil)
+      (.connect params)))
