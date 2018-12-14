@@ -13,4 +13,5 @@
             "lint-and-test-all" ["do" ["lint"] ["test-all"]]}
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.apache.ignite/ignite-core "2.7.0"]
-                 [yaosdn/yaosdn-proto "0.1.0-SNAPSHOT"]])
+                 [yaosdn/yaosdn-proto "0.1.0-SNAPSHOT"]
+                 [yaosdn/yaosdn-integration-pcap "0.1.0-SNAPSHOT"]])

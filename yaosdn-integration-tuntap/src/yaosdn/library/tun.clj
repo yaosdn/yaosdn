@@ -76,7 +76,8 @@
 
 
 (defn- write-tun-packets [interface packets]
-  (count (for [packet packets]
+  (count (for [packet packets
+               :when packet]
            (push-tun-packet interface packet))))
 
 

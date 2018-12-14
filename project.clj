@@ -7,6 +7,7 @@
             [lein-ancient "0.6.15"]
             [lein-bump-version "0.1.6"]]
   :dependencies [[org.clojure/clojure "1.9.0"]
+                 [org.clojure/tools.logging "0.4.0"]
                  [yaosdn/yaosdn-proto "0.1.0-SNAPSHOT"]
                  [yaosdn/yaosdn-integration-ignite "0.1.0-SNAPSHOT"]
                  [yaosdn/yaosdn-integration-pcap "0.1.0-SNAPSHOT"]

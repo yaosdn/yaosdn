@@ -1,5 +1,6 @@
 (ns yaosdn.library.ignite
-  (:require [yaosdn.library.proto :as proto])
+  (:require [yaosdn.library.proto :as proto]
+            [yaosdn.library.pcap :as pcap])
   (:import (org.apache.ignite Ignition)
            (org.apache.ignite.lang IgniteBiPredicate)))
 
@@ -9,7 +10,7 @@
 
 (defn- get-ignite-connection [packet-processor params]
   (let [{ignite-params :ignite-params
-         topic-name :topic-name
+         topic-names :topic-names
          messaging-configuration :messaging-configuration} params
         connection (if ignite-params
                      (Ignition/start ignite-params)
@@ -20,27 +21,34 @@
                                                    (.message connection messaging-configuration)
                                                    (.message connection))
                             queue-atom (atom [])]
+                        (doall (for [topic-name topic-names
+                                     :when topic-name]
+                                 (.localListen messaging-connection
+                                               topic-name
+                                               (reify IgniteBiPredicate
+                                                 (apply [this node-id msg]
+                                                   (swap! queue-atom conj msg)
+                                                   true)))))
                         {:queue queue-atom
-                         :connection (doto messaging-connection
-                                       (.localListen (or topic-name
-                                                         *ignite-default-topic-name*)
-                                                     (reify IgniteBiPredicate
-                                                       (apply [this node-id msg]
-                                                         (swap! queue-atom conj msg)
-                                                         true))))}))))
+                         :connection messaging-connection}))))
 
 
 (defn- read-messages [messaging filter-function]
-  (filter filter-function
-          (first (swap-vals! (-> messaging :queue)
-                             (fn [_] [])))))
+  (let [unfiltered-data (filter identity
+                                (map (fn [data]
+                                       (pcap/packet-of data
+                                                       (count data)))
+                                     (first (swap-vals! (-> messaging :queue)
+                                                        (fn [_] [])))))]
+    (into () (filter filter-function
+                     unfiltered-data))))
 
 
 (defn- write-messages [messaging router-function packets]
   (count (for [packet packets]
            (.send (:connection messaging)
                   (router-function packet)
-                  packet))))
+                  (.getRawData packet)))))
 
 
 (defrecord IgnitePacketProcessor [connection messaging]
